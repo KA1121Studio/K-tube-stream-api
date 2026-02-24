@@ -7,9 +7,11 @@
     "esModuleInterop": true,
     "skipLibCheck": true,
     "forceConsistentCasingInFileNames": true,
-    "outDir": "./dist",
+    "outDir": "./.vercel/output/functions",  
     "rootDir": "./",
-    "jsx": "preserve"
+    "jsx": "preserve",
+    "declaration": false,
+    "sourceMap": false
   },
   "include": ["api/**/*.ts"],
   "exclude": ["node_modules"]
