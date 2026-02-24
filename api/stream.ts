@@ -27,7 +27,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       retrieve_player: true
     });
 
-    const info = await youtube.getBasicInfo(videoId, 'ANDROID');
+    const info = await youtube.getBasicInfo(videoId, { client: 'ANDROID' });
 
     if (!info.streaming_data) {
       return res.status(503).json({ 
@@ -75,7 +75,9 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
         mime_type: targetFormat.mime_type,
         quality_label: targetFormat.quality_label || 'audio-only or unknown',
         bitrate: targetFormat.bitrate,
-        approx_duration_ms: info.basic_info.duration_in_sec ? info.basic_info.duration_in_sec * 1000 : null,
+        approx_duration_ms: info.basic_info.duration 
+          ? Math.round(info.basic_info.duration * 1000) 
+          : null,
         expires_in: targetFormat.url.includes('expire=') 
           ? parseInt(targetFormat.url.match(/expire=(\d+)/)?.[1] || '0') * 1000 - Date.now()
           : null
