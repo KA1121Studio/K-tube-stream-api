@@ -6,6 +6,24 @@ export const config = {
   memory: 1024               // 必要に応じて増やす（128〜3008MB）
 };
 
+async function getInfoWithFallback(youtube: Innertube, videoId: string) {
+  const clients = ['ANDROID', 'WEB', 'TV', 'IOS'];
+
+  for (const client of clients) {
+    try {
+      const info = await youtube.getBasicInfo(videoId, { client });
+      if (info.streaming_data) {
+        console.log(`Success with client: ${client}`);
+        return info;
+      }
+    } catch (e) {
+      console.log(`Failed with client: ${client}`);
+    }
+  }
+
+  return null;
+}
+
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method Not Allowed' });
@@ -27,28 +45,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       retrieve_player: true
     });
 
-let info;
-const clients = ['WEB', 'TV_EMBEDDED', 'ANDROID'] as const;
+const info = await getInfoWithFallback(youtube, videoId);
 
-for (const client of clients) {
-  try {
-    const attempt = await youtube.getInfo(videoId, { client });
-
-    console.log('client:', client);
-    console.log('playability_status:', attempt.playability_status);
-
-    if (attempt.streaming_data) {
-      info = attempt;
-      break;
-    }
-  } catch (e) {
-    console.log('client failed:', client);
-  }
-}
-
-if (!info || !info.streaming_data) {
+if (!info) {
   return res.status(503).json({
-    error: 'ストリーミングデータが取得できませんでした（全クライアント失敗）'
+    error: 'どのクライアントでもストリーミングデータを取得できませんでした'
   });
 }
     
