@@ -4,7 +4,7 @@ import { Innertube, UniversalCache } from 'youtubei.js';
 export const config = {
   maxDuration: 30,           // Vercel無料枠だと60秒だが安全側に
   memory: 1024               // 必要に応じて増やす（128〜3008MB）
-};
+ };
 
 async function getInfoWithFallback(youtube: Innertube, videoId: string) {
   const clients = ['ANDROID', 'WEB', 'TV', 'IOS'];
