@@ -10,7 +10,7 @@ async function getInfoWithFallback(youtube: Innertube, videoId: string) {
   const clients: InnerTubeClient[] = ['ANDROID', 'WEB', 'TV', 'IOS'];
   for (const client of clients) {
     try {
-      const info = await youtube.getBasicInfo(videoId, { client });
+      const info = await youtube.getInfo(videoId);
       if (info.streaming_data) {
         console.log(`Success with client: ${client}`);
         return info;
