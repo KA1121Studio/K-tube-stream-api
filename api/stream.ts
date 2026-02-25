@@ -27,8 +27,10 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       retrieve_player: true
     });
 
-    const info = await youtube.getBasicInfo(videoId, { client: 'ANDROID' });
-
+    const info = await youtube.getInfo(videoId, {
+  client: 'WEB'
+});
+    
     if (!info.streaming_data) {
       return res.status(503).json({ 
         error: 'ストリーミングデータが取得できませんでした（ライブ、地域制限、年齢制限など）' 
