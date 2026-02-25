@@ -7,7 +7,7 @@
     "build": "tsc"
   },
   "dependencies": {
-    "youtubei.js": "^latest",         
+    "youtubei.js": "latest",         
     "@vercel/node": "^3.2.0"
   },
   "devDependencies": {
