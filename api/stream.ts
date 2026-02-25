@@ -1,27 +1,10 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { Innertube, UniversalCache, type InnerTubeClient } from 'youtubei.js';
+import { Innertube, UniversalCache } from 'youtubei.js';
 
 export const config = {
   maxDuration: 30,           // Vercel無料枠だと60秒だが安全側に
   memory: 1024               // 必要に応じて増やす（128〜3008MB）
- };
-
-async function getInfoWithFallback(youtube: Innertube, videoId: string) {
-  const clients: InnerTubeClient[] = ['ANDROID', 'WEB', 'TV', 'IOS'];
-  for (const client of clients) {
-    try {
-      const info = await youtube.getInfo(videoId);
-      if (info.streaming_data) {
-        console.log(`Success with client: ${client}`);
-        return info;
-      }
-    } catch (e) {
-      console.log(`Failed with client: ${client}`);
-    }
-  }
-
-  return null;
-}
+};
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'GET') {
@@ -44,14 +27,8 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       retrieve_player: true
     });
 
-const info = await getInfoWithFallback(youtube, videoId);
+    const info = await youtube.getBasicInfo(videoId, { client: 'ANDROID' });
 
-if (!info) {
-  return res.status(503).json({
-    error: 'どのクライアントでもストリーミングデータを取得できませんでした'
-  });
-}
-    
     if (!info.streaming_data) {
       return res.status(503).json({ 
         error: 'ストリーミングデータが取得できませんでした（ライブ、地域制限、年齢制限など）' 
