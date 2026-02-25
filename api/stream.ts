@@ -1,5 +1,5 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { Innertube, UniversalCache } from 'youtubei.js';
+import { Innertube, UniversalCache, type InnerTubeClient } from 'youtubei.js';
 
 export const config = {
   maxDuration: 30,           // Vercel無料枠だと60秒だが安全側に
@@ -7,8 +7,7 @@ export const config = {
  };
 
 async function getInfoWithFallback(youtube: Innertube, videoId: string) {
-  const clients = ['ANDROID', 'WEB', 'TV', 'IOS'];
-
+  const clients: InnerTubeClient[] = ['ANDROID', 'WEB', 'TV', 'IOS'];
   for (const client of clients) {
     try {
       const info = await youtube.getBasicInfo(videoId, { client });
