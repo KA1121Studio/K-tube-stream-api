@@ -33,11 +33,17 @@ const clients = ['WEB', 'TV_EMBEDDED', 'ANDROID'] as const;
 for (const client of clients) {
   try {
     const attempt = await youtube.getInfo(videoId, { client });
+
+    console.log('client:', client);
+    console.log('playability_status:', attempt.playability_status);
+
     if (attempt.streaming_data) {
       info = attempt;
       break;
     }
-  } catch {}
+  } catch (e) {
+    console.log('client failed:', client);
+  }
 }
 
 if (!info || !info.streaming_data) {
