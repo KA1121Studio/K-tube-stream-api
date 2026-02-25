@@ -27,9 +27,24 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       retrieve_player: true
     });
 
-    const info = await youtube.getInfo(videoId, {
-  client: 'WEB'
-});
+let info;
+const clients = ['WEB', 'TV_EMBEDDED', 'ANDROID'] as const;
+
+for (const client of clients) {
+  try {
+    const attempt = await youtube.getInfo(videoId, { client });
+    if (attempt.streaming_data) {
+      info = attempt;
+      break;
+    }
+  } catch {}
+}
+
+if (!info || !info.streaming_data) {
+  return res.status(503).json({
+    error: 'ストリーミングデータが取得できませんでした（全クライアント失敗）'
+  });
+}
     
     if (!info.streaming_data) {
       return res.status(503).json({ 
