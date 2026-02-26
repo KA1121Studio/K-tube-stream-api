@@ -19,21 +19,16 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-const youtube = await Innertube.create({
-  cache: new UniversalCache(false),
-  generate_session_locally: false,  // ← これ重要！ trueだとPO Token生成が弱い
-  retrieve_player: true,
-  client_options: {  // クライアント情報を最新風に偽装
-    client_name: 'ANDROID',
-    client_version: '19.09.37',  // 2026年現在の有効なANDROIDバージョン例（古いと400）
-    hl: 'ja',  // 言語（任意）
-    gl: 'JP',  // 地域（任意）
-  },
-  // PO Tokenを手動で渡す場合（後述）
-  // po_token: 'your_po_token_here',  // まだ自動生成不安定なのでブラウザから取得推奨
-});
+    const youtube = await Innertube.create({
+      cache: new UniversalCache(false),
+      generate_session_locally: false,  // これをfalseにするとPO Tokenが付きやすくなる（400回避）
+      retrieve_player: true,             // Player JSを取得（signature復号に必要）
+      // client_options は存在しない → 削除
+      // 代わりに client_type を指定（オプション）
+      // client_type: 'ANDROID',  // コメントアウト推奨（WEBが安定する場合あり）
+    });
 
-    const info = await youtube.getBasicInfo(videoId, { client: 'ANDROID' });  // ANDROIDでmuxed取りやすい傾向
+    const info = await youtube.getBasicInfo(videoId);  // clientオプションを第2引数から削除（シンプルに）
 
     if (!info.streaming_data) {
       return res.status(503).json({
@@ -46,14 +41,12 @@ const youtube = await Innertube.create({
       ...(info.streaming_data.adaptive_formats || []),
     ];
 
-    // mp4 muxed優先 → url直があれば最高画質、なければsignature_cipherの最高muxed
+    // mp4 muxed優先 → url直があれば最高、なければsignature_cipherのmuxed
     let targetFormat = allFormats
-      .filter(f => f.mime_type?.includes('video/mp4'))
-      .filter(f => !!f.audio_quality)  // muxedのみ（音声あり）
+      .filter(f => f.mime_type?.includes('video/mp4') && !!f.audio_quality)
       .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
 
     if (!targetFormat) {
-      // muxedなければvideo-onlyの最高
       targetFormat = allFormats
         .filter(f => f.mime_type?.includes('video/mp4'))
         .sort((a, b) => (b.bitrate || 0) - (a.bitrate || 0))[0];
@@ -76,11 +69,11 @@ const youtube = await Innertube.create({
       approx_duration_ms: info.basic_info.duration
         ? Math.round(info.basic_info.duration * 1000)
         : null,
-      player_js_url: info.player?.url ? `https://www.youtube.com${info.player.url}` : null,
+      // player_js_url を youtube.player?.url から取得（retrieve_player: true で存在するはず）
+      player_js_url: youtube.player?.url ? `https://www.youtube.com${youtube.player.url}` : null,
     };
 
     if (targetFormat.url) {
-      // 稀な直URLケース（まだ一部残っているかも）
       return res.status(200).json({
         ...responseBase,
         direct_url: true,
@@ -91,8 +84,8 @@ const youtube = await Innertube.create({
     if (targetFormat.signature_cipher) {
       const params = new URLSearchParams(targetFormat.signature_cipher);
       const base_url = params.get('url') || '';
-      const sp = params.get('sp') || 'sig';  // 署名パラメータ名（sig または signature が多い）
-      const s = params.get('s') || '';       // 暗号化署名
+      const sp = params.get('sp') || 'sig';
+      const s = params.get('s') || '';
 
       return res.status(200).json({
         ...responseBase,
@@ -104,17 +97,17 @@ const youtube = await Innertube.create({
     }
 
     return res.status(500).json({ error: 'フォーマットにURLもsignature_cipherもありませんでした' });
-} catch (err: any) {
-  let detail = err.message || '不明';
-  if (err.response) {
-    try {
-      detail = await err.response.text();  // 400のレスポンス本文（JSONエラー詳細）
-    } catch {}
+  } catch (err: any) {
+    let detail = err.message || '不明';
+    if (err.response) {
+      try {
+        detail = await err.response.text();  // 400/503の詳細本文を取る
+      } catch {}
+    }
+    console.error('エラー詳細:', detail);
+    return res.status(500).json({
+      error: '処理中にエラーが発生しました',
+      message: detail.slice(0, 500),
+    });
   }
-  console.error('Innertube Error Details:', detail);
-  return res.status(500).json({
-    error: '処理中にエラーが発生しました',
-    message: detail.slice(0, 500),  // Vercelログに残る
- 　 });
-　}
 }
