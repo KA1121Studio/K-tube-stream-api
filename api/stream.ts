@@ -19,11 +19,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
   }
 
   try {
-    const youtube = await Innertube.create({
-      cache: new UniversalCache(false),
-      generate_session_locally: true,
-      retrieve_player: true,
-    });
+const youtube = await Innertube.create({
+  cache: new UniversalCache(false),
+  generate_session_locally: false,  // ← これ重要！ trueだとPO Token生成が弱い
+  retrieve_player: true,
+  client_options: {  // クライアント情報を最新風に偽装
+    client_name: 'ANDROID',
+    client_version: '19.09.37',  // 2026年現在の有効なANDROIDバージョン例（古いと400）
+    hl: 'ja',  // 言語（任意）
+    gl: 'JP',  // 地域（任意）
+  },
+  // PO Tokenを手動で渡す場合（後述）
+  // po_token: 'your_po_token_here',  // まだ自動生成不安定なのでブラウザから取得推奨
+});
 
     const info = await youtube.getBasicInfo(videoId, { client: 'ANDROID' });  // ANDROIDでmuxed取りやすい傾向
 
@@ -96,11 +104,17 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     }
 
     return res.status(500).json({ error: 'フォーマットにURLもsignature_cipherもありませんでした' });
-  } catch (err: any) {
-    console.error(err);
-    return res.status(500).json({
-      error: '処理中にエラーが発生しました',
-      message: err.message?.slice(0, 300) || '不明なエラー',
-    });
+} catch (err: any) {
+  let detail = err.message || '不明';
+  if (err.response) {
+    try {
+      detail = await err.response.text();  // 400のレスポンス本文（JSONエラー詳細）
+    } catch {}
   }
+  console.error('Innertube Error Details:', detail);
+  return res.status(500).json({
+    error: '処理中にエラーが発生しました',
+    message: detail.slice(0, 500),  // Vercelログに残る
+ 　 });
+　}
 }
