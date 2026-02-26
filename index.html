@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>Test</title>
+  <style>
+    video { width: 100%; max-width: 800px; }
+    #status { color: red; font-weight: bold; }
+  </style>
+</head>
+<body>
+  <h1>YouTube ストリームテスト</h1>
+  <input id="videoId" placeholder="YouTube Video ID (例: dQw4w9WgXcQ)" value="dQw4w9WgXcQ" />
+  <button onclick="loadVideo()">ロード & 再生</button>
+  <p id="status"></p>
+  <video id="player" controls autoplay></video>
+
+  <script>
+    const API_URL = 'https://your-vercel-app.vercel.app/api/stream';  // ← 自分のVercel URLに変更
+
+    async function decipherSignature(playerJsCode, encryptedSig) {
+      // player JSからdecipher関数を抽出（2026年現在も動作する基本パターン）
+      // 注意: YouTubeの変更でregexが壊れる可能性大 → Issue追跡 or yt-cipher外部サービス推奨
+
+      // 関数全体を探す（split("") → reverse/splice/swap → join("") の形が多い）
+      const funcRegex = /function\s*[a-zA-Z0-9$]{1,6}\s*\([a-zA-Z0-9$]+\)\s*\{[^}]*?split\(""\)[^}]*?return[^}]*?join\(""\)[^}]*?\}/s;
+      const match = playerJsCode.match(funcRegex);
+
+      if (!match) {
+        throw new Error('Decipher関数が見つかりませんでした。YouTubeのplayerが変わった可能性があります');
+      }
+
+      const funcBody = match[0];
+
+      // ヘルパー関数（例: reverse, spliceなど）を探してインライン化する必要があるが、簡易的に全体をnew Functionで実行
+      // セキュリティ: player JSはYouTube公式なのでtrusted
+      const decipher = new Function('a', `
+        ${playerJsCode}  // player全体をスコープに
+        let sig = a;
+        ${funcBody.replace(/function\s*[a-zA-Z0-9$]*\s*/, '')}  // 関数呼び出し部分
+        return sig;
+      `);
+
+      return decipher(encryptedSig);
+    }
+
+    async function getPlayableUrl(videoId) {
+      const status = document.getElementById('status');
+      status.textContent = 'APIリクエスト中...';
+
+      const res = await fetch(`${API_URL}?v=${videoId}`);
+      const data = await res.json();
+
+      if (!data.success) {
+        throw new Error(data.error || 'APIエラー');
+      }
+
+      status.textContent = 'フォーマット取得完了...';
+
+      if (data.direct_url) {
+        return data.url;
+      }
+
+      if (!data.needs_decipher) {
+        throw new Error('予期しないフォーマット');
+      }
+
+      if (!data.player_js_url) {
+        throw new Error('Player JS URLがありません');
+      }
+
+      status.textContent = 'Player JS取得中...';
+      const playerRes = await fetch(data.player_js_url);
+      const playerJs = await playerRes.text();
+
+      status.textContent = '署名復号中...（これは時間がかかる場合があります）';
+      const decodedSig = await decipherSignature(playerJs, data.encrypted_signature);
+
+      const finalUrl = `${data.base_url}&${data.signature_param}=${encodeURIComponent(decodedSig)}`;
+
+      status.textContent = '再生URL生成完了！';
+      return finalUrl;
+    }
+
+    async function loadVideo() {
+      const videoId = document.getElementById('videoId').value.trim();
+      const videoEl = document.getElementById('player');
+      const status = document.getElementById('status');
+
+      try {
+        const url = await getPlayableUrl(videoId);
+        videoEl.src = url;
+        videoEl.load();
+        videoEl.play().catch(e => console.error('自動再生失敗:', e));
+        status.textContent = '再生開始！';
+      } catch (err) {
+        console.error(err);
+        status.textContent = `エラー: ${err.message}`;
+      }
+    }
+  </script>
+</body>
+</html>
